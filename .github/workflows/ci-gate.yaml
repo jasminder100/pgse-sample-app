@@ -1,0 +1,62 @@
+name: ci-gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+env:
+  GATOR_VERSION: v3.19.1
+  CHECKOV_VERSION: 3.3.29
+  # Checkov checks that map to the PGSE rules implemented so far:
+  #   P01 -> CKV_K8S_16 | P09 -> CKV_K8S_14 | P08 -> CKV_K8S_10,11,12,13
+  CHECKOV_CHECKS: CKV_K8S_16,CKV_K8S_14,CKV_K8S_10,CKV_K8S_11,CKV_K8S_12,CKV_K8S_13
+
+jobs:
+  gator:
+    name: gator
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out app repo
+        uses: actions/checkout@v4
+
+      - name: Check out policy repo (main)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/pgse-policies
+          ref: main
+          path: policies-repo
+
+      - name: Install gator
+        run: |
+          mkdir -p "$HOME/bin"
+          curl -sSL "https://github.com/open-policy-agent/gatekeeper/releases/download/${GATOR_VERSION}/gator-${GATOR_VERSION}-linux-amd64.tar.gz" | tar xz -C "$HOME/bin" gator
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Check k8s manifests against PGSE policies
+        run: |
+          set -euo pipefail
+          ARGS=()
+          while IFS= read -r f; do ARGS+=(-f "$f"); done < <(find policies-repo/policies -name template.yaml -o -name constraint.yaml | sort)
+          N=$(( ${#ARGS[@]} / 2 ))
+          echo "Loaded $N policy files from pgse-policies"
+          [ "$N" -gt 0 ] || { echo "::error::No policy files found - refusing to pass"; exit 1; }
+          gator test "${ARGS[@]}" -f k8s/ </dev/null
+
+  checkov:
+    name: checkov
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out app repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Checkov
+        run: pip install "checkov==${CHECKOV_VERSION}"
+
+      - name: Scan k8s manifests
+        run: checkov -d k8s --framework kubernetes --check "$CHECKOV_CHECKS" --compact --quiet --skip-download
