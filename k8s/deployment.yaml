@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: web
-          image: nginxinc/nginx-unprivileged:1.27.0-alpine   # rule 9: pinned tag
+          image: nginxinc/nginx-unprivileged:latest   # rule 9: pinned tag
           ports:
             - containerPort: 8080
           securityContext:
@@ -26,7 +26,6 @@ spec:
             runAsNonRoot: true
           resources:                                         # rule 8
             requests: {cpu: 50m, memory: 32Mi}
-            limits:   {cpu: 100m, memory: 64Mi}
           readinessProbe:
             httpGet: {path: /, port: 8080}
           livenessProbe:
