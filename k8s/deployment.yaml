@@ -21,7 +21,7 @@ spec:
           ports:
             - containerPort: 8080
           securityContext:
-            privileged: false                                # rule 1
+            privileged: true                                # rule 1
             allowPrivilegeEscalation: false
             runAsNonRoot: true
           resources:                                         # rule 8
