@@ -1,0 +1,70 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "k8s/**"
+      - "Dockerfile"
+      - ".github/workflows/deploy.yaml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-south-1
+  CLUSTER_NAME: pgse-trial
+  ROLE_ARN: arn:aws:iam::563675986491:role/pgse-app-deploy
+  ECR_REPO: pgse-sample-app
+  NAMESPACE: demo
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Log in to AWS with OIDC (no stored keys)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image (tagged with commit SHA)
+        id: image
+        run: |
+          set -euo pipefail
+          IMAGE="${{ steps.ecr.outputs.registry }}/${ECR_REPO}:${GITHUB_SHA::12}"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+      - name: Connect kubectl to EKS
+        run: aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_REGION"
+
+      - name: Point manifest at the new image
+        run: |
+          sed "s|image: .*|image: ${{ steps.image.outputs.image }}|" k8s/deployment.yaml > /tmp/deployment.yaml
+          grep -n "image:" /tmp/deployment.yaml
+
+      - name: Apply to EKS (Gatekeeper checks it here)
+        run: kubectl apply -f /tmp/deployment.yaml
+
+      - name: Wait for rollout
+        run: kubectl rollout status deployment/pgse-sample-app -n "$NAMESPACE" --timeout=180s
+
+      - name: Summary
+        if: always()
+        run: kubectl get deployment,pods -n "$NAMESPACE" -l app=pgse-sample-app -o wide || true
