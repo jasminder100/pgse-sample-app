@@ -26,6 +26,8 @@ spec:
             runAsNonRoot: true
             runAsUser: 101
             readOnlyRootFilesystem: true
+            capabilities:                                    # rule 6
+              drop: ["ALL"]
           resources:                                         # rule 8
             requests: {cpu: 50m, memory: 32Mi}
             limits:   {cpu: 100m, memory: 64Mi}
