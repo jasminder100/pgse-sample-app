@@ -15,7 +15,10 @@ spec:
       labels:
         app: pgse-sample-app
     spec:
-      automountServiceAccountToken: false
+      automountServiceAccountToken: false                    # rule 25
+      securityContext:
+        seccompProfile:                                      # rule 22
+          type: RuntimeDefault
       containers:
         - name: web
           image: nginxinc/nginx-unprivileged:1.27.0-alpine   # rule 9: pinned tag
@@ -23,22 +26,22 @@ spec:
             - containerPort: 8080
           securityContext:
             privileged: false                                # rule 1
-            allowPrivilegeEscalation: false
-            runAsNonRoot: true
-            runAsUser: 101
-            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false                  # rule 3
+            runAsNonRoot: true                               # rule 2
+            runAsUser: 101                                   # rule 2
+            readOnlyRootFilesystem: true                     # rule 5
             capabilities:                                    # rule 6
               drop: ["ALL"]
           resources:                                         # rule 8
             requests: {cpu: 50m, memory: 32Mi}
             limits:   {cpu: 100m, memory: 64Mi}
-          readinessProbe:
+          readinessProbe:                                    # rule 12
             httpGet: {path: /, port: 8080}
-          livenessProbe:
+          livenessProbe:                                     # rule 12
             httpGet: {path: /, port: 8080}
-          volumeMounts:                                      # ← NEW (container level)
+          volumeMounts:                                      # rule 5: writable /tmp
             - name: tmp
               mountPath: /tmp
-      volumes:                                               # ← NEW (pod level)
+      volumes:
         - name: tmp
           emptyDir: {}
