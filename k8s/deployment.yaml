@@ -15,6 +15,7 @@ spec:
       labels:
         app: pgse-sample-app
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: web
           image: nginxinc/nginx-unprivileged:1.27.0-alpine   # rule 9: pinned tag
