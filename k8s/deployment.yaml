@@ -25,6 +25,7 @@ spec:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
             runAsUser: 101
+            readOnlyRootFilesystem: true
           resources:                                         # rule 8
             requests: {cpu: 50m, memory: 32Mi}
             limits:   {cpu: 100m, memory: 64Mi}
@@ -32,3 +33,9 @@ spec:
             httpGet: {path: /, port: 8080}
           livenessProbe:
             httpGet: {path: /, port: 8080}
+          volumeMounts:                                      # ← NEW (container level)
+            - name: tmp
+              mountPath: /tmp
+      volumes:                                               # ← NEW (pod level)
+        - name: tmp
+          emptyDir: {}
