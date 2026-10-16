@@ -24,6 +24,7 @@ spec:
             privileged: false                                # rule 1
             allowPrivilegeEscalation: false
             runAsNonRoot: true
+            runAsUser: 101
           resources:                                         # rule 8
             requests: {cpu: 50m, memory: 32Mi}
             limits:   {cpu: 100m, memory: 64Mi}
