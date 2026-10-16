@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 env:
-  GATOR_VERSION: v3.19.1
+  GATOR_VERSION: v3.23.1
   CHECKOV_VERSION: 3.3.29
   # Checkov checks that map to the PGSE rules implemented so far:
   #   P01 -> CKV_K8S_16 | P09 -> CKV_K8S_14 | P08 -> CKV_K8S_10,11,12,13
@@ -41,7 +41,8 @@ jobs:
           N=$(( ${#ARGS[@]} / 2 ))
           echo "Loaded $N policy files from pgse-policies"
           [ "$N" -gt 0 ] || { echo "::error::No policy files found - refusing to pass"; exit 1; }
-          gator test "${ARGS[@]}" -f k8s/ </dev/null
+          NS_ARGS=(); [ -d policies-repo/namespaces ] && NS_ARGS=(-f policies-repo/namespaces)
+          gator test "${ARGS[@]}" "${NS_ARGS[@]}" -f k8s/ </dev/null
 
   checkov:
     name: checkov
