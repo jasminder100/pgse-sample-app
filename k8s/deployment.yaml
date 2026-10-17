@@ -5,6 +5,9 @@ metadata:
   namespace: demo
   labels:
     app: pgse-sample-app
+    owner: platform-team
+    team: pgse
+    cost-center: cc-1001
 spec:
   replicas: 2
   selector:
