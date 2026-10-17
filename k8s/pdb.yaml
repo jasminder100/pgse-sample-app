@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pgse-sample-app
+  namespace: demo
+spec:
+  minAvailable: 1                 # rule 11: keep at least 1 of the 2 replicas up during node drains
+  selector:
+    matchLabels:
+      app: pgse-sample-app        # must match the Deployment's POD TEMPLATE labels
