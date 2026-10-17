@@ -32,11 +32,11 @@ spec:
           ports:
             - containerPort: 8080
           securityContext:
-            privileged: true                                # rule 1
+            privileged: false                                # rule 1
             allowPrivilegeEscalation: false                  # rule 3
             runAsNonRoot: true                               # rule 2
             runAsUser: 101                                   # rule 2
-            readOnlyRootFilesystem: false                     # rule 5
+            readOnlyRootFilesystem: true                     # rule 5
             capabilities:                                    # rule 6
               drop: ["ALL"]
           resources:                                         # rule 8
