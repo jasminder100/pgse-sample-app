@@ -39,14 +39,38 @@ jobs:
 
       - name: Check k8s manifests against PGSE policies
         run: |
-          set -euo pipefail
+          set -uo pipefail
           ARGS=()
           while IFS= read -r f; do ARGS+=(-f "$f"); done < <(find policies-repo/policies -name template.yaml -o -name constraint.yaml | sort)
           N=$(( ${#ARGS[@]} / 2 ))
           echo "Loaded $N policy files from pgse-policies"
           [ "$N" -gt 0 ] || { echo "::error::No policy files found - refusing to pass"; exit 1; }
           NS_ARGS=(); [ -d policies-repo/namespaces ] && NS_ARGS=(-f policies-repo/namespaces)
-          gator test "${ARGS[@]}" "${NS_ARGS[@]}" -f k8s/ </dev/null
+
+          START=$(date +%s%3N)
+          gator test "${ARGS[@]}" "${NS_ARGS[@]}" -f k8s/ </dev/null > gator.out 2>&1
+          RC=$?
+          END=$(date +%s%3N)
+          cat gator.out
+
+          # Metrics: one line per violation, rule id = the [Pxx] tag in the message
+          VIOL=$(grep -c '\[P[0-9][0-9]\]' gator.out || true)
+          BYRULE=$(grep -o '\[P[0-9][0-9]\]' gator.out | tr -d '[]' | sort | uniq -c \
+                   | awk 'BEGIN{printf "{"} {printf "%s\"%s\":%s", (NR>1?",":""), $2, $1} END{printf "}"}')
+          PASSED=$([ "$RC" -eq 0 ] && echo true || echo false)
+          mkdir -p metrics
+          printf '{"tool":"gator","durationMs":%s,"exitCode":%s,"passed":%s,"violations":%s,"byRule":%s}\n' \
+            "$((END-START))" "$RC" "$PASSED" "${VIOL:-0}" "$BYRULE" > metrics/gator.json
+          cat metrics/gator.json
+          exit "$RC"
+
+      - name: Upload gator metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: metrics-gator
+          path: metrics/gator.json
+          if-no-files-found: ignore
 
   checkov:
     name: checkov
@@ -64,4 +88,71 @@ jobs:
         run: pip install "checkov==${CHECKOV_VERSION}"
 
       - name: Scan k8s manifests
-        run: checkov -d k8s --framework kubernetes --check "$CHECKOV_CHECKS" --compact --quiet --skip-download
+        run: |
+          set -uo pipefail
+          START=$(date +%s%3N)
+          checkov -d k8s --framework kubernetes --check "$CHECKOV_CHECKS" --skip-download -o json > checkov.json 2>/dev/null
+          RC=$?
+          END=$(date +%s%3N)
+
+          # Readable result in the log: one line per failure, with file and line range
+          jq -r 'if type=="array" then .[] else . end | .results.failed_checks[]?
+                 | "FAILED \(.check_id) \(.file_path):\(.file_line_range[0])-\(.file_line_range[1])  \(.check_name)"' checkov.json || true
+          jq -r 'if type=="array" then .[] else . end | "Passed: \(.summary.passed)  Failed: \(.summary.failed)"' checkov.json || true
+
+          # Metrics
+          FAILED=$(jq '[if type=="array" then .[] else . end | .summary.failed] | add // 0' checkov.json 2>/dev/null || echo 0)
+          BYCHECK=$(jq -c '[if type=="array" then .[] else . end | .results.failed_checks[]?.check_id]
+                           | group_by(.) | map({(.[0]): length}) | add // {}' checkov.json 2>/dev/null || echo '{}')
+          PASSED=$([ "$RC" -eq 0 ] && echo true || echo false)
+          mkdir -p metrics
+          printf '{"tool":"checkov","durationMs":%s,"exitCode":%s,"passed":%s,"violations":%s,"byCheck":%s}\n' \
+            "$((END-START))" "$RC" "$PASSED" "$FAILED" "$BYCHECK" > metrics/checkov.json
+          cat metrics/checkov.json
+          exit "$RC"
+
+      - name: Upload checkov metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: metrics-checkov
+          path: metrics/checkov.json
+          if-no-files-found: ignore
+
+  metrics:
+    name: metrics
+    needs: [gator, checkov]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download job metrics
+        uses: actions/download-artifact@v4
+        with:
+          pattern: metrics-*
+          merge-multiple: true
+          path: metrics
+
+      - name: Combine and summarize
+        run: |
+          ls metrics/*.json >/dev/null 2>&1 || { echo "No metrics produced"; exit 0; }
+          jq -s \
+            --arg runId "$GITHUB_RUN_ID" --arg sha "$GITHUB_SHA" \
+            --arg event "$GITHUB_EVENT_NAME" --arg ref "$GITHUB_REF_NAME" \
+            --arg pr "${{ github.event.pull_request.number }}" \
+            --arg timestamp "$(date -u +%FT%TZ)" \
+            '{runId:$runId, sha:$sha, event:$event, ref:$ref, pr:$pr, timestamp:$timestamp, tools:.}' \
+            metrics/*.json > ci-metrics.json
+          cat ci-metrics.json
+          {
+            echo "### PGSE CI metrics"
+            echo ""
+            echo "| Tool | Result | Duration | Violations | By rule / check |"
+            echo "|---|---|---|---|---|"
+            jq -r '.tools[] | "| \(.tool) | \(if .passed then " pass" else " fail" end) | \(.durationMs) ms | \(.violations) | \((.byRule // .byCheck) | tostring) |"' ci-metrics.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload combined metrics
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-metrics
+          path: ci-metrics.json
