@@ -5,6 +5,13 @@ metadata:
   namespace: demo
   labels:
     app: pgse-sample-app
+    owner: platform-team
+    team: pgse
+    cost-center: cc-1001
+    environment: prod
+  annotations:
+    app.kubernetes.io/managed-by: github-actions
+    repository-url: https://github.com/jasminder100/pgse-sample-app
 spec:
   replicas: 2
   selector:
@@ -15,19 +22,33 @@ spec:
       labels:
         app: pgse-sample-app
     spec:
+      automountServiceAccountToken: false                    # rule 25
+      securityContext:
+        seccompProfile:                                      # rule 22
+          type: RuntimeDefault
       containers:
         - name: web
-          image: nginxinc/nginx-unprivileged:1.27.0-alpine   # rule 9: pinned tag
+          image: 563675986491.dkr.ecr.ap-south-1.amazonaws.com/mirror/nginx-unprivileged:1.27.0-alpine   # rule 9: pinned tag
           ports:
             - containerPort: 8080
           securityContext:
             privileged: false                                # rule 1
-            allowPrivilegeEscalation: false
-            runAsNonRoot: true
+            allowPrivilegeEscalation: false                  # rule 3
+            runAsNonRoot: true                               # rule 2
+            runAsUser: 101                                   # rule 2
+            readOnlyRootFilesystem: true                     # rule 5
+            capabilities:                                    # rule 6
+              drop: ["ALL"]
           resources:                                         # rule 8
             requests: {cpu: 50m, memory: 32Mi}
             limits:   {cpu: 100m, memory: 64Mi}
-          readinessProbe:
+          readinessProbe:                                    # rule 12
             httpGet: {path: /, port: 8080}
-          livenessProbe:
+          livenessProbe:                                     # rule 12
             httpGet: {path: /, port: 8080}
+          volumeMounts:                                      # rule 5: writable /tmp
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

@@ -60,7 +60,7 @@ jobs:
           grep -n "image:" /tmp/deployment.yaml
 
       - name: Apply to EKS (Gatekeeper checks it here)
-        run: kubectl apply -f /tmp/deployment.yaml
+        run: kubectl apply -f k8s/pdb.yaml -f /tmp/deployment.yaml
 
       - name: Wait for rollout
         run: kubectl rollout status deployment/pgse-sample-app -n "$NAMESPACE" --timeout=180s
