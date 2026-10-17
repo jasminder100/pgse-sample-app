@@ -39,7 +39,7 @@ jobs:
 
       - name: Check k8s manifests against PGSE policies
         run: |
-          set -uo pipefail
+          set +e -uo pipefail   # keep going on failure: we capture the exit code ourselves
           ARGS=()
           while IFS= read -r f; do ARGS+=(-f "$f"); done < <(find policies-repo/policies -name template.yaml -o -name constraint.yaml | sort)
           N=$(( ${#ARGS[@]} / 2 ))
@@ -89,7 +89,7 @@ jobs:
 
       - name: Scan k8s manifests
         run: |
-          set -uo pipefail
+          set +e -uo pipefail   # keep going on failure: we capture the exit code ourselves
           START=$(date +%s%3N)
           checkov -d k8s --framework kubernetes --check "$CHECKOV_CHECKS" --skip-download -o json > checkov.json 2>/dev/null
           RC=$?
