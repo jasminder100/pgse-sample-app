@@ -8,9 +8,13 @@ on:
 env:
   GATOR_VERSION: v3.23.1
   CHECKOV_VERSION: 3.3.29
-  # Checkov checks that map to the PGSE rules implemented so far:
-  #   P01 -> CKV_K8S_16 | P09 -> CKV_K8S_14 | P08 -> CKV_K8S_10,11,12,13
-  CHECKOV_CHECKS: CKV_K8S_16,CKV_K8S_14,CKV_K8S_10,CKV_K8S_11,CKV_K8S_12,CKV_K8S_13
+  # Checkov checks mapped to PGSE deny-mode rules. Each ID was verified to (1) catch the rule's
+  # disallowed sample and (2) pass compliant workloads. gator remains the source of truth.
+  #   P01 16 | P02 23 | P03 20 | P04 17,18,19 | P05 22 | P06 28,37,39 | P08 10-13
+  #   P09 14 | P12 8,9 | P22 31 | P23 26 | P25 38
+  # No Checkov equivalent (gator only): P10, P19, P20, P24.
+  # Excluded: CKV_K8S_25 (flags NET_BIND_SERVICE, which P06 allows: false positive).
+  CHECKOV_CHECKS: CKV_K8S_16,CKV_K8S_23,CKV_K8S_20,CKV_K8S_17,CKV_K8S_18,CKV_K8S_19,CKV_K8S_22,CKV_K8S_28,CKV_K8S_37,CKV_K8S_39,CKV_K8S_10,CKV_K8S_11,CKV_K8S_12,CKV_K8S_13,CKV_K8S_14,CKV_K8S_8,CKV_K8S_9,CKV_K8S_31,CKV_K8S_26,CKV_K8S_38
 
 jobs:
   gator:
