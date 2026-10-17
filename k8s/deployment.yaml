@@ -8,6 +8,7 @@ metadata:
     owner: platform-team
     team: pgse
     cost-center: cc-1001
+    environment: prod
 spec:
   replicas: 2
   selector:
