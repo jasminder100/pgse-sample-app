@@ -9,6 +9,9 @@ metadata:
     team: pgse
     cost-center: cc-1001
     environment: prod
+  annotations:
+    app.kubernetes.io/managed-by: github-actions
+    repository-url: https://github.com/jasminder100/pgse-sample-app
 spec:
   replicas: 2
   selector:
