@@ -1,0 +1,4 @@
+
+# Generated CI metrics reports
+ci-metrics-report*.json
+ci-metrics-report*.csv
