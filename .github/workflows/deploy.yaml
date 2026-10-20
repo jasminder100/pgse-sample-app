@@ -48,10 +48,25 @@ jobs:
           docker push "$IMAGE"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
 
-      - name: Connect kubectl to AKS
+      - name: Set up kubelogin (AKS uses Entra ID)
+        uses: azure/use-kubelogin@v1
+        with:
+          kubelogin-version: latest
+
+      - name: Connect kubectl to AKS as the deploy identity
         run: |
           az aks get-credentials -g "${{ vars.AZURE_RG }}" -n "${{ vars.AKS_NAME }}" --overwrite-existing
-          kubectl config current-context
+          kubelogin convert-kubeconfig -l azurecli
+
+      - name: Prove least privilege (RBAC via Entra group pgse-deployers)
+        run: |
+          check() { printf '%-45s %s\n' "$*" "$(kubectl auth can-i "$@" 2>/dev/null || true)"; }
+          check create deployments -n demo        # expected: yes
+          check create poddisruptionbudgets -n demo # expected: yes
+          check get secrets -n demo               # expected: no
+          check create deployments -n dev         # expected: no
+          check delete constraints --all-namespaces # expected: no
+          check create clusterrolebindings        # expected: no
 
       - name: Point manifest at the new image
         run: |
