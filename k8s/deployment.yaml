@@ -28,7 +28,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: web
-          image: 563675986491.dkr.ecr.ap-south-1.amazonaws.com/mirror/nginx-unprivileged:1.27.0-alpine   # rule 9: pinned tag
+          image: pgseacrjs2026.azurecr.io/mirror/nginx-unprivileged:1.27.0-alpine   # rule 9: pinned tag
           ports:
             - containerPort: 8080
           securityContext:
