@@ -28,7 +28,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: web
-          image: pgseacrjs2026.azurecr.io/pgse-sample-app:1.0.0   # release version: bump this to deploy
+          image: pgseacrjs2026.azurecr.io/pgse-sample-app:1.0.1   # release version: bump this to deploy
           ports:
             - containerPort: 8080
           securityContext:
