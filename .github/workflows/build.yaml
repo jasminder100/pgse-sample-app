@@ -1,0 +1,83 @@
+name: build
+
+# Builds and pushes the image named in k8s/deployment.yaml.
+# Deploying is Argo CD's job: this workflow has NO cluster access.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "Dockerfile"
+      - "k8s/deployment.yaml"
+      - ".github/workflows/build.yaml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write          # GitHub OIDC token for Azure login
+  contents: read
+
+concurrency:
+  group: build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo (with previous commit, to see what changed)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Read release image from the manifest
+        id: img
+        run: |
+          set -euo pipefail
+          IMAGE=$(grep -oP '^\s*image:\s*\K\S+' k8s/deployment.yaml)
+          EXPECTED="${{ vars.ACR_NAME }}.azurecr.io/pgse-sample-app:"
+          case "$IMAGE" in
+            "$EXPECTED"*) ;;
+            *) echo "::error::image must be ${EXPECTED}<version>, got $IMAGE"; exit 1 ;;
+          esac
+          echo "image=$IMAGE"   >> "$GITHUB_OUTPUT"
+          echo "tag=${IMAGE##*:}" >> "$GITHUB_OUTPUT"
+          echo "Release image: $IMAGE"
+
+      - name: Log in to Azure with OIDC (managed identity, no stored keys)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Decide - build, skip, or refuse (tags are immutable)
+        id: decide
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.img.outputs.tag }}"
+          EXISTS=$(az acr repository show-tags -n "${{ vars.ACR_NAME }}" --repository pgse-sample-app \
+                     --query "[?@=='$TAG']" -o tsv 2>/dev/null || true)
+          CODE_CHANGED=$(git diff --name-only HEAD^1 HEAD -- app Dockerfile | wc -l)
+          if [ -z "$EXISTS" ]; then
+            echo "Tag $TAG is new - building."
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          elif [ "$CODE_CHANGED" -gt 0 ]; then
+            echo "::error::Tag $TAG already exists but app code changed. Bump the version in k8s/deployment.yaml."
+            exit 1
+          else
+            echo "Tag $TAG already exists and app code is unchanged - nothing to build."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and push image
+        if: steps.decide.outputs.build == 'true'
+        run: |
+          set -euo pipefail
+          az acr login --name "${{ vars.ACR_NAME }}"
+          docker build -t "${{ steps.img.outputs.image }}" .
+          docker push "${{ steps.img.outputs.image }}"
+
+      - name: Summary
+        run: |
+          echo "Image: ${{ steps.img.outputs.image }}"
+          echo "Argo CD will roll this version out from git. This workflow never touches the cluster."

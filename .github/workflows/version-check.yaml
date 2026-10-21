@@ -1,0 +1,29 @@
+name: version-check
+
+# App code changed in this PR? Then the release version in k8s/deployment.yaml must change too.
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  version-bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require a version bump when app code changes
+        run: |
+          set -euo pipefail
+          BASE="origin/${{ github.base_ref }}"
+          CODE_CHANGED=$(git diff --name-only "$BASE"...HEAD -- app Dockerfile | wc -l)
+          tag() { grep -oP '^\s*image:\s*\S+:\K\S+' ; }
+          OLD=$(git show "$BASE:k8s/deployment.yaml" | tag)
+          NEW=$(tag < k8s/deployment.yaml)
+          echo "base version: $OLD   PR version: $NEW   app files changed: $CODE_CHANGED"
+          if [ "$CODE_CHANGED" -gt 0 ] && [ "$OLD" = "$NEW" ]; then
+            echo "::error file=k8s/deployment.yaml::App code changed but the version is still $OLD - bump the image tag."
+            exit 1
+          fi
+          echo "OK"
