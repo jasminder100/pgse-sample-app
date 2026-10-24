@@ -3,7 +3,7 @@ repositoryUrl: https://github.com/jasminder100/pgse-sample-app
 
 image:
   repository: pgseacrjs2026.azurecr.io/pgse-sample-app
-  tag: "1.0.1"          # release version: bump this to deploy
+  tag: "latest"         # NEGATIVE TEST - must be blocked by P09
 
 replicaCount: 2         # rule 16: prod needs >= 2
 containerPort: 8080
