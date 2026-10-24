@@ -20,6 +20,7 @@ spec:
         app: {{ .Values.appName }}
     spec:
       automountServiceAccountToken: false                    # rule 25
+      serviceAccountName: {{ .Values.appName }}               # workload identity for Key Vault
       securityContext:
         seccompProfile:                                      # rule 22
           type: RuntimeDefault
@@ -49,6 +50,19 @@ spec:
           volumeMounts:                                      # rule 5: writable /tmp
             - name: tmp
               mountPath: /tmp
+            {{- if .Values.keyVault.enabled }}
+            - name: secrets-store                              # Key Vault secrets as read-only files
+              mountPath: {{ .Values.keyVault.mountPath }}
+              readOnly: true
+            {{- end }}
       volumes:
         - name: tmp
           emptyDir: {}
+        {{- if .Values.keyVault.enabled }}
+        - name: secrets-store
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: {{ .Values.appName }}-kv
+        {{- end }}
