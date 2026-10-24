@@ -20,12 +20,16 @@ spec:
         app: {{ .Values.appName }}
     spec:
       automountServiceAccountToken: false                    # rule 25
+      hostNetwork: true                                      # DEMO: breaks P04
       securityContext:
         seccompProfile:                                      # rule 22
           type: RuntimeDefault
       containers:
         - name: web
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          env:
+            - name: DB_PASSWORD
+              value: "SuperSecret123"                       # DEMO: breaks P24
           ports:
             - containerPort: {{ .Values.containerPort }}
           securityContext:                                   # hardcoded: not overridable via values
