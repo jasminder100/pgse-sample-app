@@ -20,3 +20,12 @@ resources:              # rule 8
 
 pdb:
   minAvailable: 1       # rule 11
+
+keyVault:               # secrets come from Azure Key Vault via the CSI driver (SecretProviderClass)
+  enabled: true
+  name: pgse-kv-js2026
+  tenantId: 4ac50105-0c66-404e-a107-7cbd8a9a6442
+  clientId: 7d79dcb7-4350-4fd7-878f-39e4ba0e0026   # managed identity id-pgse-sample-app (an ID, not a secret)
+  mountPath: /mnt/secrets-store
+  secrets:
+    - db-password
