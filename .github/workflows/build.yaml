@@ -1,6 +1,6 @@
 name: build
 
-# Builds and pushes the image named in k8s/deployment.yaml.
+# Builds and pushes the image the Helm chart renders (chart/values.yaml: image.repository + image.tag).
 # Deploying is Argo CD's job: this workflow has NO cluster access.
 on:
   push:
@@ -8,7 +8,7 @@ on:
     paths:
       - "app/**"
       - "Dockerfile"
-      - "k8s/deployment.yaml"
+      - "chart/values.yaml"
       - ".github/workflows/build.yaml"
   workflow_dispatch:
 
@@ -20,6 +20,9 @@ concurrency:
   group: build
   cancel-in-progress: false
 
+env:
+  HELM_VERSION: v3.22.0
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -29,11 +32,20 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Read release image from the manifest
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Read release image from the rendered chart
         id: img
         run: |
           set -euo pipefail
-          IMAGE=$(grep -oP '^\s*image:\s*\K\S+' k8s/deployment.yaml)
+          IMAGES=$(helm template pgse-sample-app chart -n demo | grep -oP '^\s*image:\s*"?\K[^"\s]+' | sort -u)
+          if [ -z "$IMAGES" ] || [ "$(echo "$IMAGES" | wc -l)" -ne 1 ]; then
+            echo "::error::chart must render exactly one image, got: ${IMAGES:-none}"; exit 1
+          fi
+          IMAGE="$IMAGES"
           EXPECTED="${{ vars.ACR_NAME }}.azurecr.io/pgse-sample-app:"
           case "$IMAGE" in
             "$EXPECTED"*) ;;
@@ -62,7 +74,7 @@ jobs:
             echo "Tag $TAG is new - building."
             echo "build=true" >> "$GITHUB_OUTPUT"
           elif [ "$CODE_CHANGED" -gt 0 ]; then
-            echo "::error::Tag $TAG already exists but app code changed. Bump the version in k8s/deployment.yaml."
+            echo "::error::Tag $TAG already exists but app code changed. Bump image.tag in chart/values.yaml."
             exit 1
           else
             echo "Tag $TAG already exists and app code is unchanged - nothing to build."
