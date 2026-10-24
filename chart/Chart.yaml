@@ -1,0 +1,7 @@
+apiVersion: v2
+name: pgse-sample-app
+description: PGSE demo sample app, deployed by Argo CD
+type: application
+version: 0.1.0
+# No appVersion on purpose: the release version lives only in values.yaml (image.tag),
+# so there is one source of truth for CI and Argo CD.

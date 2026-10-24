@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.appName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Values.appName }}
+    {{- toYaml .Values.ownershipLabels | nindent 4 }}
+  annotations:
+    app.kubernetes.io/managed-by: argocd
+    repository-url: {{ .Values.repositoryUrl }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.appName }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.appName }}
+    spec:
+      automountServiceAccountToken: false                    # rule 25
+      securityContext:
+        seccompProfile:                                      # rule 22
+          type: RuntimeDefault
+      containers:
+        - name: web
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          ports:
+            - containerPort: {{ .Values.containerPort }}
+          securityContext:                                   # hardcoded: not overridable via values
+            privileged: false                                # rule 1
+            allowPrivilegeEscalation: false                  # rule 3
+            runAsNonRoot: true                               # rule 2
+            runAsUser: 101                                   # rule 2
+            readOnlyRootFilesystem: true                     # rule 5
+            capabilities:                                    # rule 6
+              drop: ["ALL"]
+          resources:                                         # rule 8
+            {{- toYaml .Values.resources | nindent 12 }}
+          readinessProbe:                                    # rule 12
+            httpGet:
+              path: /
+              port: {{ .Values.containerPort }}
+          livenessProbe:                                     # rule 12
+            httpGet:
+              path: /
+              port: {{ .Values.containerPort }}
+          volumeMounts:                                      # rule 5: writable /tmp
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
