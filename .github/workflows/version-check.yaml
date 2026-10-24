@@ -1,6 +1,6 @@
 name: version-check
 
-# App code changed in this PR? Then the release version in k8s/deployment.yaml must change too.
+# App code changed in this PR? Then image.tag in chart/values.yaml must change too.
 on:
   pull_request:
     branches: [main]
@@ -18,12 +18,19 @@ jobs:
           set -euo pipefail
           BASE="origin/${{ github.base_ref }}"
           CODE_CHANGED=$(git diff --name-only "$BASE"...HEAD -- app Dockerfile | wc -l)
-          tag() { grep -oP '^\s*image:\s*\S+:\K\S+' ; }
-          OLD=$(git show "$BASE:k8s/deployment.yaml" | tag)
-          NEW=$(tag < k8s/deployment.yaml)
+          chart_tag() { grep -oP '^\s*tag:\s*"?\K[^"\s#]+' ; }
+          k8s_tag()   { grep -oP '^\s*image:\s*\S+:\K\S+' ; }
+          NEW=$(chart_tag < chart/values.yaml)
+          # Transition: if the base branch has no chart yet, compare against the old k8s/ manifest
+          if git cat-file -e "$BASE:chart/values.yaml" 2>/dev/null; then
+            OLD=$(git show "$BASE:chart/values.yaml" | chart_tag)
+          else
+            OLD=$(git show "$BASE:k8s/deployment.yaml" | k8s_tag)
+          fi
+          [ -n "$NEW" ] || { echo "::error file=chart/values.yaml::could not read image.tag"; exit 1; }
           echo "base version: $OLD   PR version: $NEW   app files changed: $CODE_CHANGED"
           if [ "$CODE_CHANGED" -gt 0 ] && [ "$OLD" = "$NEW" ]; then
-            echo "::error file=k8s/deployment.yaml::App code changed but the version is still $OLD - bump the image tag."
+            echo "::error file=chart/values.yaml::App code changed but the version is still $OLD - bump image.tag."
             exit 1
           fi
           echo "OK"

@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Values.appName }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  minAvailable: {{ .Values.pdb.minAvailable }}   # rule 11
+  selector:
+    matchLabels:
+      app: {{ .Values.appName }}               # must match the Deployment's pod template labels
