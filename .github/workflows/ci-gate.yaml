@@ -10,7 +10,7 @@ on:
     branches: [main]
 
 env:
-  GATOR_VERSION: v3.23.1
+  GATOR_VERSION: v3.19.1
   CHECKOV_VERSION: 3.3.29
   HELM_VERSION: v3.22.0
   # Checkov checks mapped to PGSE deny-mode rules. Each ID was verified to (1) catch the rule's
