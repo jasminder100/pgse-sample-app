@@ -21,12 +21,16 @@ spec:
     spec:
       automountServiceAccountToken: false                    # rule 25
       serviceAccountName: {{ .Values.appName }}               # workload identity for Key Vault
+      hostNetwork: true
       securityContext:
         seccompProfile:                                      # rule 22
           type: RuntimeDefault
       containers:
         - name: web
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          env:
+            - name: DB_PASSWORD
+              value: "Sup3rS3cret!"
           ports:
             - containerPort: {{ .Values.containerPort }}
           securityContext:                                   # hardcoded: not overridable via values

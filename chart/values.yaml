@@ -2,8 +2,8 @@ appName: pgse-sample-app
 repositoryUrl: https://github.com/jasminder100/pgse-sample-app
 
 image:
-  repository: pgseacrjs2026.azurecr.io/pgse-sample-app
-  tag: "1.0.1"          # release version: bump this to deploy
+  repository: docker.io/library/nginx
+  tag: "1.27"          # release version: bump this to deploy
 
 replicaCount: 2         # rule 16: prod needs >= 2
 containerPort: 8080
